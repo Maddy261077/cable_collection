@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ScrollView } from 'react-native';
-import { Card, Chip, ActivityIndicator } from 'react-native-paper';
+import { View, Text, FlatList, StyleSheet, ScrollView, SafeAreaView, StatusBar } from 'react-native';
+import { Card, Chip, ActivityIndicator, IconButton } from 'react-native-paper';
 import { subscribeToCustomers } from '../firebase/customers';
 import { subscribeToCollectionsByMonth } from '../firebase/collections';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-const BRAND = '#1565C0';
+const PRIMARY = '#004AAD';
+const SUCCESS = '#00C853';
+const DANGER = '#D50000';
+const BG = '#F8F9FA';
 
 export default function DashboardScreen() {
   const [customers, setCustomers] = useState([]);
@@ -29,96 +33,166 @@ export default function DashboardScreen() {
   const paid = customers.filter((c) => paidIds.has(c.id));
   const unpaid = customers.filter((c) => !paidIds.has(c.id));
 
-  if (loading) return <ActivityIndicator style={{ flex: 1 }} size="large" color={BRAND} />;
+  if (loading) return <ActivityIndicator style={{ flex: 1 }} size="large" color={PRIMARY} />;
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>📅 {monthName} {year}</Text>
-      </View>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greeting}>Good Day! 👋</Text>
+            <Text style={styles.subGreeting}>{monthName} {year} Overview</Text>
+          </View>
+          <IconButton icon="bell-outline" size={24} iconColor={PRIMARY} style={styles.notification} />
+        </View>
 
-      <View style={styles.statsRow}>
-        <StatCard label="Total" value={customers.length} color="#37474F" />
-        <StatCard label="Paid" value={paid.length} color="#2E7D32" />
-        <StatCard label="Unpaid" value={unpaid.length} color="#C62828" />
-      </View>
+        <View style={styles.statsContainer}>
+          <StatCard label="Total" value={customers.length} icon="account-group" color={PRIMARY} />
+          <StatCard label="Paid" value={paid.length} icon="check-circle" color={SUCCESS} />
+          <StatCard label="Unpaid" value={unpaid.length} icon="alert-circle" color={DANGER} />
+        </View>
 
-      <SectionTitle title={`✅ Paid (${paid.length})`} color="#2E7D32" />
-      <FlatList
-        data={paid}
-        keyExtractor={(i) => i.id}
-        scrollEnabled={false}
-        renderItem={({ item }) => {
-          const col = collections.find((c) => c.customerId === item.id);
-          return (
-            <Card style={[styles.card, { borderLeftColor: '#2E7D32' }]}>
-              <Card.Content style={styles.cardContent}>
-                <View>
-                  <Text style={styles.name}>{item.name}</Text>
-                  <Text style={styles.sub}>ID: {item.uniqueId} | {item.street}</Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.amount}>₹{col?.amount}</Text>
-                  <Chip style={{ backgroundColor: col?.paymentMethod === 'UPI' ? '#E3F2FD' : '#F9FBE7', marginTop: 4 }}
-                    textStyle={{ fontSize: 10 }}>{col?.paymentMethod}</Chip>
-                </View>
-              </Card.Content>
-            </Card>
-          );
-        }}
-        ListEmptyComponent={<Text style={styles.empty}>No paid customers yet</Text>}
-      />
+        <View style={styles.content}>
+          <SectionTitle title="✅ Recent Payments" color={SUCCESS} count={paid.length} />
+          <FlatList
+            data={paid.slice(0, 5)}
+            keyExtractor={(i) => i.id}
+            scrollEnabled={false}
+            renderItem={({ item }) => {
+              const col = collections.find((c) => c.customerId === item.id);
+              return (
+                <Card style={styles.card}>
+                  <Card.Content style={styles.cardContent}>
+                    <View style={styles.cardLeft}>
+                      <View style={[styles.avatar, { backgroundColor: '#E8F5E9' }]}>
+                        <MaterialCommunityIcons name="account" size={20} color={SUCCESS} />
+                      </View>
+                      <View style={{ marginLeft: 12 }}>
+                        <Text style={styles.name}>{item.name}</Text>
+                        <Text style={styles.subText}>{item.street}</Text>
+                      </View>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.amount}>₹{col?.amount}</Text>
+                      <Chip 
+                        compact 
+                        style={[styles.chip, { backgroundColor: col?.paymentMethod === 'UPI' ? '#E3F2FD' : '#F9FBE7' }]}
+                        textStyle={styles.chipText}
+                      >
+                        {col?.paymentMethod}
+                      </Chip>
+                    </View>
+                  </Card.Content>
+                </Card>
+              );
+            }}
+            ListEmptyComponent={<Text style={styles.empty}>No entries found</Text>}
+          />
 
-      <SectionTitle title={`❌ Unpaid (${unpaid.length})`} color="#C62828" />
-      <FlatList
-        data={unpaid}
-        keyExtractor={(i) => i.id}
-        scrollEnabled={false}
-        renderItem={({ item }) => (
-          <Card style={[styles.card, { borderLeftColor: '#C62828' }]}>
-            <Card.Content style={styles.cardContent}>
-              <View>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.sub}>ID: {item.uniqueId} | {item.street}</Text>
-                <Text style={styles.sub}>📞 {item.phone}</Text>
-              </View>
-              <Chip style={{ backgroundColor: '#FFEBEE' }} textStyle={{ fontSize: 10, color: '#C62828' }}>Due</Chip>
-            </Card.Content>
-          </Card>
-        )}
-        ListEmptyComponent={<Text style={styles.empty}>All customers paid! 🎉</Text>}
-      />
-      <View style={{ height: 20 }} />
-    </ScrollView>
+          <SectionTitle title="❌ Unpaid Dues" color={DANGER} count={unpaid.length} />
+          <FlatList
+            data={unpaid.slice(0, 5)}
+            keyExtractor={(i) => i.id}
+            scrollEnabled={false}
+            renderItem={({ item }) => (
+              <Card style={styles.card}>
+                <Card.Content style={styles.cardContent}>
+                  <View style={styles.cardLeft}>
+                    <View style={[styles.avatar, { backgroundColor: '#FFEBEE' }]}>
+                      <MaterialCommunityIcons name="account-alert" size={20} color={DANGER} />
+                    </View>
+                    <View style={{ marginLeft: 12 }}>
+                      <Text style={styles.name}>{item.name}</Text>
+                      <Text style={styles.subText}>{item.phone}</Text>
+                    </View>
+                  </View>
+                  <IconButton icon="chevron-right" size={20} iconColor="#B0BEC5" />
+                </Card.Content>
+              </Card>
+            )}
+            ListEmptyComponent={<Text style={styles.empty}>All clear! 🎉</Text>}
+          />
+        </View>
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-function StatCard({ label, value, color }) {
+function StatCard({ label, value, icon, color }) {
   return (
-    <View style={[styles.statCard, { borderTopColor: color }]}>
+    <View style={styles.statCard}>
+      <View style={[styles.iconBlob, { backgroundColor: color + '15' }]}>
+        <MaterialCommunityIcons name={icon} size={22} color={color} />
+      </View>
       <Text style={[styles.statValue, { color }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
 
-function SectionTitle({ title, color }) {
-  return <Text style={[styles.sectionTitle, { color }]}>{title}</Text>;
+function SectionTitle({ title, color, count }) {
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={[styles.sectionTitle, { color }]}>{title}</Text>
+      <Text style={styles.sectionCount}>{count} total</Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
-  header: { backgroundColor: '#1565C0', padding: 20, paddingTop: 10 },
-  headerTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold', textAlign: 'center' },
-  statsRow: { flexDirection: 'row', justifyContent: 'space-around', padding: 16 },
-  statCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16, alignItems: 'center', flex: 1, marginHorizontal: 4, borderTopWidth: 4, elevation: 2 },
-  statValue: { fontSize: 28, fontWeight: 'bold' },
-  statLabel: { fontSize: 12, color: '#607D8B', marginTop: 4 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
-  card: { marginHorizontal: 16, marginVertical: 4, borderRadius: 10, borderLeftWidth: 4, elevation: 1 },
-  cardContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  name: { fontSize: 15, fontWeight: '600', color: '#263238' },
-  sub: { fontSize: 12, color: '#78909C', marginTop: 2 },
-  amount: { fontSize: 16, fontWeight: 'bold', color: '#2E7D32' },
-  empty: { textAlign: 'center', color: '#90A4AE', padding: 12, fontStyle: 'italic' },
+  container: { flex: 1, backgroundColor: BG },
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: 20, 
+    paddingTop: 15, 
+    paddingBottom: 10,
+    backgroundColor: '#fff'
+  },
+  greeting: { fontSize: 22, fontWeight: 'bold', color: '#263238' },
+  subGreeting: { fontSize: 13, color: '#78909C', marginTop: 2 },
+  notification: { backgroundColor: '#F5F7FA', borderRadius: 12 },
+  statsContainer: { 
+    flexDirection: 'row', 
+    padding: 20, 
+    gap: 12,
+    backgroundColor: '#fff',
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+  },
+  statCard: { 
+    flex: 1, 
+    backgroundColor: '#F8F9FA', 
+    borderRadius: 20, 
+    padding: 15, 
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ECEFF1'
+  },
+  iconBlob: { padding: 10, borderRadius: 15, marginBottom: 8 },
+  statValue: { fontSize: 22, fontWeight: 'bold' },
+  statLabel: { fontSize: 11, color: '#90A4AE', fontWeight: '600', marginTop: 2, textTransform: 'uppercase' },
+  content: { padding: 20 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 12 },
+  sectionTitle: { fontSize: 17, fontWeight: 'bold' },
+  sectionCount: { fontSize: 12, color: '#90A4AE' },
+  card: { backgroundColor: '#fff', marginBottom: 10, borderRadius: 16, elevation: 1 },
+  cardContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
+  cardLeft: { flexDirection: 'row', alignItems: 'center' },
+  avatar: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  name: { fontSize: 15, fontWeight: 'bold', color: '#263238' },
+  subText: { fontSize: 12, color: '#90A4AE', marginTop: 2 },
+  amount: { fontSize: 16, fontWeight: 'bold', color: '#263238' },
+  chip: { height: 24, marginTop: 4, borderRadius: 8 },
+  chipText: { fontSize: 10, fontWeight: 'bold' },
+  empty: { textAlign: 'center', color: '#B0BEC5', marginTop: 10, fontStyle: 'italic' },
 });
+

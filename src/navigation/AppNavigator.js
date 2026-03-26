@@ -29,20 +29,32 @@ export default function AppNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerStyle: { backgroundColor: BRAND },
-        headerTintColor: '#fff',
+        headerTitleStyle: { fontWeight: 'bold' },
+        headerStyle: { backgroundColor: '#fff', elevation: 0, shadowOpacity: 0 },
+        headerTintColor: '#263238',
         tabBarActiveTintColor: BRAND,
         tabBarInactiveTintColor: INACTIVE,
-        tabBarStyle: { paddingBottom: 5, height: 60 },
-        tabBarIcon: ({ color, size }) => {
+        tabBarStyle: { 
+          paddingBottom: 8, 
+          height: 70, 
+          backgroundColor: '#fff',
+          borderTopWidth: 0,
+          elevation: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarIcon: ({ color, size, focused }) => {
           const icons = {
-            Dashboard: 'view-dashboard',
-            Customers: 'account-group',
-            Collect: 'cash-plus',
-            Filter: 'filter-variant',
-            Reports: 'file-chart',
+            Dashboard: focused ? 'view-dashboard' : 'view-dashboard-outline',
+            Customers: focused ? 'account-group' : 'account-group-outline',
+            Collect: focused ? 'cash-plus' : 'cash-plus',
+            Filter: focused ? 'filter-variant' : 'filter-variant',
+            Reports: focused ? 'file-chart' : 'file-chart-outline',
           };
-          return <MaterialCommunityIcons name={icons[route.name]} size={size} color={color} />;
+          return <MaterialCommunityIcons name={icons[route.name]} size={focused ? size + 4 : size} color={color} />;
         },
       })}
     >

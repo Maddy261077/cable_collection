@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, ScrollView, Alert } from 'react-native';
-import { Text, Button, Card, Chip, ActivityIndicator } from 'react-native-paper';
+import { View, StyleSheet, FlatList, ScrollView, Alert, SafeAreaView, TouchableOpacity } from 'react-native';
+import { Text, Button, Card, Chip, ActivityIndicator, Surface, IconButton } from 'react-native-paper';
 import { subscribeToCollectionsByMonth } from '../firebase/collections';
 import { subscribeToCustomers } from '../firebase/customers';
 import { exportCSV } from '../utils/exportCSV';
 import { exportPDF } from '../utils/exportPDF';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-const BRAND = '#1565C0';
+const PRIMARY = '#004AAD';
+const SUCCESS = '#00C853';
+const BG = '#F8F9FA';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -20,8 +23,7 @@ export default function ReportsScreen() {
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    const unsub = subscribeToCustomers(setCustomers);
-    return unsub;
+    return subscribeToCustomers(setCustomers);
   }, []);
 
   useEffect(() => {
@@ -47,98 +49,154 @@ export default function ReportsScreen() {
   };
 
   const handleExportCSV = async () => {
-    if (collections.length === 0) { Alert.alert('No Data', 'No records found for this month.'); return; }
+    if (collections.length === 0) { Alert.alert('No Data', 'There are no records to export for this month.'); return; }
     setExporting(true);
-    await exportCSV(collections, MONTHS[month - 1], year);
-    setExporting(false);
+    try {
+      await exportCSV(collections, MONTHS[month - 1], year);
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleExportPDF = async () => {
-    if (collections.length === 0) { Alert.alert('No Data', 'No records found for this month.'); return; }
+    if (collections.length === 0) { Alert.alert('No Data', 'There are no records to export for this month.'); return; }
     setExporting(true);
-    await exportPDF(collections, customers, MONTHS[month - 1], year);
-    setExporting(false);
+    try {
+      await exportPDF(collections, customers, MONTHS[month - 1], year);
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
-    <View style={styles.container}>
-      {/* Month Selector */}
-      <View style={styles.monthSelector}>
-        <Button icon="chevron-left" mode="text" onPress={() => changeMonth(-1)} textColor="#fff" compact />
-        <Text style={styles.monthText}>{MONTHS[month - 1]} {year}</Text>
-        <Button icon="chevron-right" mode="text" onPress={() => changeMonth(1)} textColor="#fff" compact />
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <IconButton icon="chevron-left" iconColor={PRIMARY} size={28} onPress={() => changeMonth(-1)} />
+        <View style={styles.monthDisplay}>
+          <Text style={styles.monthName}>{MONTHS[month - 1]}</Text>
+          <Text style={styles.yearName}>{year}</Text>
+        </View>
+        <IconButton icon="chevron-right" iconColor={PRIMARY} size={28} onPress={() => changeMonth(1)} />
       </View>
 
-      {/* Summary */}
-      <View style={styles.summaryRow}>
-        <SumCard label="Total Collected" value={`₹${totalCollected}`} color="#2E7D32" />
-        <SumCard label="Cash" value={cashCount} color="#6D4C41" />
-        <SumCard label="UPI" value={upiCount} color="#1565C0" />
-        <SumCard label="Paid" value={collections.length} color="#6A1B9A" />
-      </View>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.summaryGrid}>
+          <ReportStat label="Total Volume" value={`₹${totalCollected}`} icon="cash-multiple" color={SUCCESS} />
+          <ReportStat label="Cash Payments" value={cashCount} icon="hand-coin-outline" color="#8D6E63" />
+          <ReportStat label="UPI Payments" value={upiCount} icon="cellphone-arrow-down" color={PRIMARY} />
+          <ReportStat label="Total Paid" value={collections.length} icon="check-decagram-outline" color="#7E57C2" />
+        </View>
 
-      {/* Export Buttons */}
-      <View style={styles.exportRow}>
-        <Button mode="contained" icon="file-delimited" onPress={handleExportCSV} loading={exporting}
-          style={styles.exportBtn} buttonColor="#2E7D32" compact>CSV</Button>
-        <Button mode="contained" icon="file-pdf-box" onPress={handleExportPDF} loading={exporting}
-          style={styles.exportBtn} buttonColor="#C62828" compact>PDF</Button>
-      </View>
+        <View style={styles.exportSection}>
+          <Text style={styles.sectionTitle}>Export Reports</Text>
+          <View style={styles.exportRow}>
+            <Surface style={styles.exportCard} elevation={1}>
+              <TouchableOpacity style={styles.exportBtn} onPress={handleExportCSV} disabled={exporting}>
+                <MaterialCommunityIcons name="file-excel-outline" size={24} color="#2E7D32" />
+                <Text style={styles.exportBtnText}>Excel CSV</Text>
+              </TouchableOpacity>
+            </Surface>
+            <Surface style={styles.exportCard} elevation={1}>
+              <TouchableOpacity style={styles.exportBtn} onPress={handleExportPDF} disabled={exporting}>
+                <MaterialCommunityIcons name="file-pdf-box" size={24} color="#C62828" />
+                <Text style={styles.exportBtnText}>Modern PDF</Text>
+              </TouchableOpacity>
+            </Surface>
+          </View>
+        </View>
 
-      {/* Records List */}
-      {loading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} size="large" color={BRAND} />
-      ) : (
-        <FlatList
-          data={collections}
-          keyExtractor={(i) => i.id}
-          contentContainerStyle={{ padding: 12 }}
-          renderItem={({ item }) => (
-            <Card style={styles.card}>
-              <Card.Content style={styles.cardRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.name}>{item.customerName}</Text>
-                  <Text style={styles.sub}>🪪 {item.customerUniqueId} | 🏘 {item.customerStreet}</Text>
-                  <Text style={styles.sub}>📅 {item.paidDate}</Text>
+        <View style={styles.recordsSection}>
+          <View style={styles.recordsHeader}>
+            <Text style={styles.sectionTitle}>Collections History</Text>
+            {exporting && <ActivityIndicator size="small" color={PRIMARY} />}
+          </View>
+
+          {loading ? (
+            <ActivityIndicator style={{ marginTop: 40 }} color={PRIMARY} />
+          ) : (
+            <FlatList
+              data={collections}
+              keyExtractor={(i) => i.id}
+              scrollEnabled={false}
+              renderItem={({ item }) => (
+                <Card style={styles.card}>
+                  <Card.Content style={styles.cardContent}>
+                    <View style={styles.cardLeft}>
+                      <View style={[styles.avatar, { backgroundColor: item.paymentMethod === 'UPI' ? '#E3F2FD' : '#F9FBE7' }]}>
+                        <MaterialCommunityIcons 
+                          name={item.paymentMethod === 'UPI' ? 'cellphone-check' : 'cash'} 
+                          size={18} 
+                          color={item.paymentMethod === 'UPI' ? '#1565C0' : '#827717'} 
+                        />
+                      </View>
+                      <View style={{ marginLeft: 12 }}>
+                        <Text style={styles.name}>{item.customerName}</Text>
+                        <Text style={styles.sub}>ID: {item.customerUniqueId} • {item.paidDate}</Text>
+                      </View>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.amount}>₹{item.amount}</Text>
+                      <Text style={styles.methodLabel}>{item.paymentMethod}</Text>
+                    </View>
+                  </Card.Content>
+                </Card>
+              )}
+              ListEmptyComponent={
+                <View style={styles.empty}>
+                  <MaterialCommunityIcons name="calendar-blank" size={50} color="#CFD8DC" />
+                  <Text style={styles.emptyText}>No collections recorded for this month</Text>
                 </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.amount}>₹{item.amount}</Text>
-                  <Chip style={{ backgroundColor: item.paymentMethod === 'UPI' ? '#E3F2FD' : '#F9FBE7', marginTop: 4 }}
-                    textStyle={{ fontSize: 10 }}>{item.paymentMethod}</Chip>
-                </View>
-              </Card.Content>
-            </Card>
+              }
+            />
           )}
-          ListEmptyComponent={<Text style={styles.empty}>No collections recorded for {MONTHS[month - 1]} {year}</Text>}
-        />
-      )}
-    </View>
+        </View>
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-function SumCard({ label, value, color }) {
+function ReportStat({ label, value, icon, color }) {
   return (
-    <View style={[styles.sumCard, { borderTopColor: color }]}>
-      <Text style={[styles.sumValue, { color }]}>{value}</Text>
-      <Text style={styles.sumLabel}>{label}</Text>
-    </View>
+    <Surface style={styles.reportStat} elevation={1}>
+      <View style={[styles.iconCircle, { backgroundColor: color + '15' }]}>
+        <MaterialCommunityIcons name={icon} size={20} color={color} />
+      </View>
+      <Text style={[styles.statValue, { color }]}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </Surface>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
-  monthSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: BRAND, paddingHorizontal: 8, paddingVertical: 4 },
-  monthText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  summaryRow: { flexDirection: 'row', padding: 10, gap: 6 },
-  sumCard: { flex: 1, backgroundColor: '#fff', borderRadius: 10, padding: 10, alignItems: 'center', borderTopWidth: 3, elevation: 1 },
-  sumValue: { fontSize: 14, fontWeight: 'bold' },
-  sumLabel: { fontSize: 10, color: '#90A4AE', marginTop: 2, textAlign: 'center' },
-  exportRow: { flexDirection: 'row', paddingHorizontal: 12, gap: 10, marginBottom: 4 },
-  exportBtn: { flex: 1, borderRadius: 8 },
-  card: { marginBottom: 8, borderRadius: 10, elevation: 1 },
-  cardRow: { flexDirection: 'row', alignItems: 'center' },
-  name: { fontSize: 15, fontWeight: '600', color: '#263238' },
-  sub: { fontSize: 12, color: '#78909C', marginTop: 2 },
-  amount: { fontSize: 16, fontWeight: 'bold', color: '#2E7D32' },
-  empty: { textAlign: 'center', color: '#90A4AE', marginTop: 40, fontStyle: 'italic' },
+  container: { flex: 1, backgroundColor: BG },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 10, backgroundColor: '#fff', borderBottomLeftRadius: 24, borderBottomRightRadius: 24, elevation: 4 },
+  monthDisplay: { alignItems: 'center' },
+  monthName: { fontSize: 20, fontWeight: 'bold', color: '#263238' },
+  yearName: { fontSize: 13, color: PRIMARY, fontWeight: '700', marginTop: -2 },
+  scrollContent: { padding: 16 },
+  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 25 },
+  reportStat: { width: '48.5%', backgroundColor: '#fff', padding: 15, borderRadius: 20, alignItems: 'center' },
+  iconCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  statValue: { fontSize: 16, fontWeight: 'bold' },
+  statLabel: { fontSize: 11, color: '#90A4AE', marginTop: 2 },
+  exportSection: { marginBottom: 25 },
+  sectionTitle: { fontSize: 17, fontWeight: 'bold', color: '#263238', marginBottom: 15, marginLeft: 4 },
+  exportRow: { flexDirection: 'row', gap: 12 },
+  exportCard: { flex: 1, borderRadius: 16, backgroundColor: '#fff', overflow: 'hidden' },
+  exportBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, gap: 8 },
+  exportBtnText: { fontWeight: 'bold', color: '#455A64', fontSize: 14 },
+  recordsSection: { flex: 1 },
+  recordsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  card: { backgroundColor: '#fff', marginBottom: 10, borderRadius: 16, elevation: 1 },
+  cardContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
+  cardLeft: { flexDirection: 'row', alignItems: 'center' },
+  avatar: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  name: { fontSize: 14, fontWeight: 'bold', color: '#263238' },
+  sub: { fontSize: 11, color: '#90A4AE', marginTop: 1 },
+  amount: { fontSize: 15, fontWeight: 'bold', color: '#263238' },
+  methodLabel: { fontSize: 9, color: '#90A4AE', textTransform: 'uppercase', fontWeight: 'bold', marginTop: 2 },
+  empty: { marginTop: 40, alignItems: 'center' },
+  emptyText: { color: '#B0BEC5', marginTop: 10, fontSize: 14, fontStyle: 'italic' },
 });
+
